@@ -17,7 +17,7 @@ def get_site_content(url):
         pass
     return ""
 
-def check_is_valid_company(name, website, snippet, client=None, model_name=None):
+def check_is_valid_company(name, website, snippet, client=None, model_name=None, domain="Web Development Agency"):
     content = ""
     if website:
         content = get_site_content(website)
@@ -27,7 +27,7 @@ def check_is_valid_company(name, website, snippet, client=None, model_name=None)
     prompt = f"""
     Analyze the following company data.
     
-    1. Determine if it is likely a Web Development, Software Development, or Digital Marketing Agency.
+    1. Determine if it is likely a company operating in the field of: "{domain}".
     2. Extract any generic contact email address (e.g. contact@, info@, hello@) found in the content.
     
     Data:

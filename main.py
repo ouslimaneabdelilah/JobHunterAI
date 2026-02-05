@@ -208,26 +208,37 @@ def save_data(data, filename):
 
 def menu_scrape():
     print("GATHERING DATA")
+    domain = input("Domain / Activity Field (e.g. Web Development, Civil Engineering): ")
     city = input("City: ")
-    keyword = input("Keyword: ")
     
-    print(f"Scraping {keyword} in {city}...")
-    raw_companies = scraper.search_companies(city, keyword, max_results=100)
+    print(f"Generating search keywords for '{domain}' with AI...")
+    keywords_list = generator.generate_search_keywords(domain, AI_CLIENT, AI_MODEL)
+    print(f"AI suggests searching for: {keywords_list}")
     
-    if not raw_companies:
+    all_companies = []
+    
+    for keyword in keywords_list:
+        print(f"\n>>> Scraping Keyword: {keyword} in {city}...")
+        # Limiting results per keyword to avoid taking too long, since we have multiple keywords
+        results = scraper.search_companies(city, keyword, max_results=30) 
+        if results:
+            all_companies.extend(results)
+    
+    if not all_companies:
         print("No companies found.")
         return
 
-    df_raw = pd.DataFrame(raw_companies)
+    df_raw = pd.DataFrame(all_companies)
     try:
         df_raw = df_raw.drop_duplicates(subset=['name', 'website'])
     except: pass
     
     raw_companies = df_raw.to_dict('records')
 
-    print(f"Found {len(raw_companies)} results.")
+    print(f"Found {len(raw_companies)} total unique results.")
     
-    raw_filename = f"leads_{city}_{keyword}_RAW.xlsx"
+    # Use domain in filename instead of single keyword
+    raw_filename = f"leads_{city}_{domain}_RAW.xlsx"
     raw_filename = "".join([c for c in raw_filename if c.isalpha() or c.isdigit() or c in ['_','.']]).rstrip()
     
     save_data(raw_companies, raw_filename)
@@ -248,7 +259,7 @@ def menu_scrape():
         if website:
             seen_websites.add(website)
 
-        is_dev_agency, found_email = filter.check_is_valid_company(name, website, snippet, AI_CLIENT, AI_MODEL)
+        is_dev_agency, found_email = filter.check_is_valid_company(name, website, snippet, AI_CLIENT, AI_MODEL, domain=domain)
         
         if not is_dev_agency:
             print(f"[REJECTED] {name} - Not a relevant agency")
@@ -266,7 +277,7 @@ def menu_scrape():
         print(f"[ACCEPTED] {name}")
         valid_companies.append(company)
         
-    final_filename = f"leads_{city}_{keyword}.xlsx"
+    final_filename = f"leads_{city}_{domain}.xlsx"
     final_filename = "".join([c for c in final_filename if c.isalpha() or c.isdigit() or c in ['_','.']]).rstrip()
     
     if valid_companies:

@@ -120,3 +120,71 @@ def create_pdf(text, filename):
     except Exception as e:
         print(f"PDF Error: {e}")
         return False
+
+def generate_search_keywords(domain, client, model_name):
+    """
+    Generates a list of Google Maps search keywords based on a user's professional domain.
+    """
+    prompt = f"""
+    I need to find companies and agencies in the directory for Google Maps in the field of: "{domain}".
+    
+    Please generate a python list of 5 to 10 specific search terms (keywords) that I should type into Google Maps to find these companies.
+    Focus on terms that would appear in the business name or category.
+    
+    Example input: "Web Development"
+    Example output: ["Web Design Agency", "Software Company", "Digital Marketing Agency", "Website Developer", "IT Consultant"]
+    
+    RETURN ONLY THE PYTHON LIST. NO MARKDOWN. NO EXPLANATION.
+    """
+    
+    text_response = ""
+    
+    # 1. Try Primary Client (GitHub/Azure)
+    if client and model_name:
+        try:
+            messages = [
+                {"role": "user", "content": prompt}
+            ]
+            response = client.complete(
+                messages=messages,
+                model=model_name,
+                temperature=0.7
+            )
+            text_response = response.choices[0].message.content
+        except Exception as e:
+            print(f"   [Primary AI Failed: {e}] Switching to fallback...")
+
+    # 2. Try Fallback (Gemini)
+    if not text_response:
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        if gemini_key:
+            try:
+                if not genai:
+                    import google.generativeai as genai
+                genai.configure(api_key=gemini_key)
+                # Try a robust list of models (Prioritizing Flash)
+                models_to_try = ['gemini-flash-latest', 'gemini-1.5-flash', 'gemini-1.5-pro']
+                for m in models_to_try:
+                    try:
+                        model = genai.GenerativeModel(m)
+                        response = model.generate_content(prompt)
+                        text_response = response.text
+                        break
+                    except: continue
+            except: pass
+
+    # Parse the response into a list
+    if text_response:
+        import ast
+        try:
+            # Clean up potential markdown formatting like ```python ... ```
+            clean_text = text_response.replace("```python", "").replace("```", "").strip()
+            keywords = ast.literal_eval(clean_text)
+            if isinstance(keywords, list):
+                return keywords
+        except:
+            # Fallback parsing: split by newlines if it's not a valid list
+            return [line.strip("- *") for line in text_response.splitlines() if line.strip()]
+
+    # Default fallback if AI fails completely
+    return [f"{domain} agency", f"{domain} company", f"{domain} services"]
